@@ -56,7 +56,10 @@ function calculatePointsForRace(race) {
   let driverPoints = {};
   let points = 1;
   let index = 0;
-  while (results[index].status === "Finished") {
+  while (
+    results[index].status.toLowerCase() === "finished" ||
+    results[index].status.toLowerCase().includes("lap")
+  ) {
     let driverRes = results[index];
     driverPoints[driverRes.Driver.driverId] = points;
     points++;
@@ -81,12 +84,13 @@ async function getResults() {
     totalTeamPoints[t.name] = { points: 0, pointsOverTime: [] };
   });
 
+  // TODO: make paginated calls
   const jsonRes = await (
-    await fetch(`${ERGAST_BASE}/2022/results.json?limit=100`)
+    await fetch(`${ERGAST_BASE}/2022/results.json?limit=10000`)
   ).json();
   const raceResults = jsonRes.MRData.RaceTable.Races;
 
-  console.log("raw race results:");
+  console.log("raw results:");
   console.log(raceResults);
 
   raceResults.forEach((raceElem) => {
@@ -108,7 +112,6 @@ async function getResults() {
         if (!(driverId in driverPoints)) {
           console.warn(`found no results for ${d} and no viable substitutes`);
         }
-        // TODO: need to deal with driver substitutions... causes value to go NaN
         raceTeamPoints.set(t.name, currPoints + driverPoints[driverId]);
       });
     });
@@ -123,7 +126,13 @@ async function getResults() {
       }
     });
 
+    // winning team (lowest score) of each race gets 10 points
+    // losing team (highest score) of each race gets 1 point
+    // in case of a tie, teams will get the same points determined by the place they share.
+    // but teams scoring below the tied teams are not impacted by this.
+    // i.e. tied first = 10 points each. next team down gets 8 points as they're in third place (2 teams ahead of them)
     let ranking = 10;
+    let tied_teams = 1;
     for (let i = 0; i < sortedTeams.length; ++i) {
       let tName = sortedTeams[i][0];
       let currPoints = totalTeamPoints[tName].points;
@@ -138,7 +147,10 @@ async function getResults() {
         sortedTeams[i + 1][1] !== sortedTeams[i][1]
       ) {
         // the next team in the list does not have the same score so should have a different ranking
-        ranking--;
+        ranking -= tied_teams;
+        tied_teams = 1;
+      } else {
+        tied_teams++;
       }
     }
   });
