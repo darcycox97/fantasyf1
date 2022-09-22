@@ -47,6 +47,7 @@ const TEAMS = [
 const SUBSTITUTIONS = {
   1: [["vettel", "hulkenberg"]],
   2: [["vettel", "hulkenberg"]],
+  16: [["albon", "de_vries"]],
 };
 
 function calculatePointsForRace(race) {
